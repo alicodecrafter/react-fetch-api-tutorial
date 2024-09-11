@@ -1,18 +1,23 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+
 
 function App() {
   const [data, setData] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isError, setIsError] = useState(false);
   const [page, setPage] = useState(1);
+  const abortController = useRef<AbortController | undefined>();
 
   useEffect(() => {
     const getData = async () => {
       setIsLoading(true);
-
       try {
+        abortController.current?.abort();
+        abortController.current = new AbortController();
         setIsError(false);
-        const response = await fetch(`https://jsonplaceholder.typicode.com/posts?_limit=5&_page=${page}`);
+        const response = await fetch(`https://jsonplaceholder.typicode.com/posts?_limit=5&_page=${page}`, {
+          signal: abortController.current.signal
+        });
 
         const data = await response.json();
 
@@ -21,12 +26,16 @@ function App() {
         }
 
         setData(data);
-      } catch (error) {
-        console.error('My error', error);
+      } catch (error: any) {
+        if (error.name === 'AbortError') {
+          console.log('Fetch aborted');
+          return
+        }
+
         setIsError(true);
-      } finally {
-        setIsLoading(false);
       }
+
+      setIsLoading(false);
     }
 
     getData();
@@ -36,6 +45,7 @@ function App() {
     <div>
       <h1>React fetch api</h1>
       <button onClick={() => setPage(page + 1)}>Next page</button>
+
       {isLoading && <p>Loading...</p>}
 
       {isError && <p>Something went wrong</p>}
